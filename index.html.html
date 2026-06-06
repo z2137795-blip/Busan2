@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>釜山自由行．Busan Travel App</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/3.3.4/vue.global.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        cream: {
+                            50: '#FFFDF9',
+                            100: '#FEF9EF',
+                            200: '#FDF3DA',
+                            300: '#FBE7B5',
+                            700: '#8A7649',
+                            800: '#5C4E2E',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        body { font-family: 'PingFang TC', 'Heiti TC', 'Noto Sans TC', sans-serif; background-color: #FEF9EF; color: #333333; }
+    </style>
+</head>
+<body class="flex justify-center min-h-screen bg-stone-100">
+
+    <div id="app" class="w-full max-w-md bg-cream-50 min-h-screen shadow-xl flex flex-col relative overflow-hidden pb-24">
+        
+        <!-- 頂部導航欄 -->
+        <header class="bg-cream-100/90 backdrop-blur-md sticky top-0 z-50 px-4 py-3 flex justify-between items-center border-b border-cream-200 shadow-xs">
+            <div>
+                <span class="text-[10px] text-cream-700 tracking-widest block font-bold">BUSAN 5-DAYS APP</span>
+                <h1 class="text-base font-semibold text-cream-800 tracking-wide">
+                    {{ tabTitle }}
+                </h1>
+            </div>
+            <div class="text-xs bg-cream-200 text-cream-800 px-2 py-0.5 rounded-full font-bold">
+                釜山行
+            </div>
+        </header>
+
+        <!-- 主要內容區 -->
+        <main class="flex-1 overflow-y-auto px-4 pt-3 space-y-4">
+            
+            <!-- 1. 行程表 Tab -->
+            <div v-if="activeTab === 'schedule'" class="space-y-4">
+                
+                <!-- 行前準備 TODO 清單 -->
+                <div class="bg-white border border-cream-200 rounded-2xl p-4 shadow-sm space-y-2.5">
+                    <div class="flex justify-between items-center border-b border-stone-100 pb-1.5">
+                        <span class="text-xs font-bold text-cream-700 flex items-center gap-1">
+                            <i data-lucide="check-square" class="w-4 h-4"></i> 🧳 行前準備必帶清單
+                        </span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-1.5 max-h-36 overflow-y-auto no-scrollbar">
+                        <div v-for="todo in todoList" :key="todo.id" class="flex items-center text-xs py-1 px-2 bg-stone-50 rounded-lg">
+                            <label class="flex items-center space-x-2 text-stone-700 cursor-pointer w-full">
+                                <input type="checkbox" v-model="todo.done" @change="saveToStorage" class="rounded text-cream-700 w-3.5 h-3.5">
+                                <span :class="{'line-through text-stone-400': todo.done}" class="truncate">{{ todo.text }}</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 天數切換頁籤 -->
+                <div class="flex space-x-2 overflow-x-auto no-scrollbar py-2 sticky top-[53px] bg-cream-50/95 backdrop-blur-sm z-40 border-b border-cream-100">
+                    <button 
+                        v-for="day in days" :key="day.id" @click="selectedDay = day.id"
+                        :class="selectedDay === day.id ? 'bg-cream-700 text-cream-50 shadow-sm font-semibold' : 'bg-cream-100 text-cream-800'"
+                        class="flex-1 px-3 py-2 rounded-xl text-center min-w-[72px] transition-all"
+                    >
+                        <span class="block text-[9px] opacity-70">Day {{ day.id }}</span>
+                        <span class="block text-xs">{{ day.date }}</span>
+                    </button>
+                </div>
+
+                <!-- 行程卡片列表 -->
+                <div class="space-y-3">
+                    <div v-for="(item, i) in filteredSchedule" :key="item.id" class="bg-white border border-cream-200 p-4 rounded-2xl shadow-xs flex items-start gap-3">
+                        <div class="flex-shrink-0 bg-cream-100 text-cream-800 text-[11px] font-mono font-bold px-2 py-1 rounded-lg mt-0.5 shadow-2xs">
+                            {{ item.time }}
+                        </div>
+                        <div class="flex-1 space-y-1">
+                            <div class="flex justify-between items-center">
+                                <h4 class="text-sm font-bold text-stone-800">{{ item.location }}</h4>
+                                <span class="text-[9px] bg-stone-100 text-stone-600 px-1.5 py-0.5 rounded font-medium">{{ item.category }}</span>
+                            </div>
+                            <p v-if="item.note" class="text-xs text-stone-500 bg-stone-50 p-2.5 rounded-xl border border-dashed border-stone-200 mt-1.5 whitespace-pre-line leading-relaxed">
+                                {{ item.note }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- 2. 景點真實照片與快速導航 Tab -->
+            <div v-if="activeTab === 'map'" class="space-y-3">
+                <div class="bg-white border border-cream-200 rounded-2xl p-4 shadow-sm space-y-2.5">
+                    <div class="border-b border-stone-100 pb-2">
+                        <span class="text-xs font-bold text-stone-700 flex items-center gap-1">🧭 釜山核心景點實景大圖與地圖導航</span>
+                    </div>
+                    <div class="grid grid-cols-1 gap-4 max-h-[72vh] overflow-y-auto no-scrollbar">
+                        <div v-for="(spot, index) in landmarkList" :key="index" class="bg-stone-50 rounded-2xl overflow-hidden border border-stone-200 shadow-3xs flex flex-col">
+                            <!-- 正確的真實景點大圖 -->
+                            <div class="w-full h-40 bg-stone-200 relative">
+                                <img :src="spot.img" class="w-full h-full object-cover object-center" alt="景點真實照片">
+                                <span class="absolute top-2 left-2 bg-cream-700 text-white text-[11px] w-6 h-6 rounded-full flex items-center justify-center font-mono font-bold shadow-md">
+                                    {{ index + 1 }}
+                                </span>
+                            </div>
+                            <!-- 標題、必買內容、導航按鈕 -->
+                            <div class="p-3.5 bg-white space-y-1.5">
+                                <div class="flex justify-between items-center">
+                                    <div>
+                                        <h4 class="text-sm font-black text-stone-800">{{ spot.name }}</h4>
+                                        <p class="text-[9px] text-stone-400 font-mono tracking-wider">BUSAN DESTINATION</p>
+                                    </div>
+                                    <a :href="'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent('釜山 ' + spot.name)" 
+                                       target="_blank" 
+                                       class="bg-cream-100 border border-cream-200 text-cream-800 px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1 shadow-3xs hover:bg-cream-200 transition-colors">
+                                        <span>導航</span><i data-lucide="navigation" class="w-3 h-3"></i>
+                                    </a>
+                                </div>
+                                <!-- 西面地下街或特定景點的詳細備註提示 -->
+                                <p v-if="spot.info" class="text-[11px] text-cream-700 bg-cream-100/50 p-2 rounded-xl border border-dashed border-cream-200 leading-normal">
+                                    {{ spot.info }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. 清單 Tab -->
+            <div v-if="activeTab === 'shopping'" class="space-y-4">
+                <div class="bg-white border border-cream-200 rounded-2xl p-4 shadow-sm space-y-3">
+                    <span class="text-xs font-bold text-stone-700 block">🛍️ 釜山必買私人購物清單（各自手機獨立儲存與拍圖）</span>
+                    
+                    <div class="space-y-2.5 max-h-[50vh] overflow-y-auto no-scrollbar">
+                        <div v-for="item in shoppingList" :key="item.id" class="p-3 bg-stone-50 rounded-2xl border border-stone-100 shadow-3xs flex flex-col gap-2">
+                            <div class="flex items-center justify-between text-xs">
+                                <label class="flex items-center space-x-2.5 cursor-pointer">
+                                    <input type="checkbox" v-model="item.done" @change="saveToStorage" class="rounded text-cream-700 w-4 h-4">
+                                    <span :class="{'line-through text-stone-400': item.done}" class="font-bold text-stone-700">{{ item.name }}</span>
+                                </label>
+                                <button @click="deleteShoppingItem(item.id)" class="text-stone-300 hover:text-red-500"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                            </div>
+                            
+                            <!-- 照片展示與上傳區 -->
+                            <div class="flex items-center gap-3 pl-6">
+                                <div v-if="item.image" class="relative w-16 h-16 rounded-lg overflow-hidden border border-stone-200 shadow-2xs">
+                                    <img :src="item.image" class="w-full h-full object-cover">
+                                    <button @click="removeShoppingImage(item.id)" class="absolute top-0 right-0 bg-black/50 text-white rounded-bl p-0.5"><i data-lucide="x" class="w-3 h-3"></i></button>
+                                </div>
+                                <label v-else class="flex items-center gap-1 bg-white hover:bg-stone-100 border border-stone-200 text-stone-500 text-[10px] px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors shadow-3xs">
+                                    <i data-lucide="image" class="w-3.5 h-3.5"></i> <span>新增商品照片 / 拍照</span>
+                                    <input type="file" accept="image/*" @change="uploadShoppingImage($event, item.id)" class="hidden">
+                                </label>
+                            </div>
+                        </div>
+                        <div v-if="shoppingList.length === 0" class="text-center py-12 text-xs text-stone-400">目前清單空空的，快去新增想買的物品吧！</div>
+                    </div>
+                    
+                    <div class="flex gap-2 pt-2 border-t border-stone-100">
+                        <input type="text" v-model="newShoppingText" placeholder="輸入要採購的商品名稱..." @keyup.enter="addShoppingItem" class="text-xs flex-1 bg-stone-50 border border-stone-200 rounded-xl px-3 py-2.5 focus:outline-none">
+                        <button @click="addShoppingItem" class="bg-cream-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-2xs">新增</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. 記帳 Tab -->
+            <div v-if="activeTab === 'expense'" class="space-y-4">
+                <div class="flex space-x-1.5 overflow-x-auto no-scrollbar py-1">
+                    <button v-for="d in 5" :key="d" @click="expenseDay = d" :class="expenseDay === d ? 'bg-stone-800 text-white font-bold' : 'bg-white border border-stone-200 text-stone-600'" class="text-xs px-3 py-1.5 rounded-xl flex-shrink-0 flex-1 text-center">Day {{ d }}</button>
+                </div>
+
+                <!-- 記帳看板 -->
+                <div class="bg-white border border-cream-200 rounded-2xl p-4 shadow-sm grid grid-cols-2 gap-2 text-center">
+                    <div class="border-r border-stone-100">
+                        <span class="text-[10px] text-stone-400 block">Day {{ expenseDay }} 累計開銷</span>
+                        <span class="text-sm font-bold text-stone-700 block mt-0.5">NT$ {{ calcDayTotal(expenseDay).twd }}</span>
+                        <span class="text-[10px] font-mono text-cream-700 block">₩ {{ calcDayTotal(expenseDay).krw }}</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-stone-400 block">5天旅程總開銷統計</span>
+                        <span class="text-sm font-black text-stone-800 block mt-0.5">NT$ {{ calcAllTotal().twd }}</span>
+                        <span class="text-[10px] font-mono text-cream-700 block">₩ {{ calcAllTotal().krw }}</span>
+                    </div>
+                </div>
+
+                <!-- 記帳輸入與明細 -->
+                <div class="bg-white border border-cream-200 rounded-2xl p-4 shadow-sm space-y-3">
+                    <span class="text-xs font-bold text-stone-700 block">💰 新增個人開銷帳目 (匯率以 0.024 計算)</span>
+                    <div class="space-y-1.5 max-h-[220px] overflow-y-auto no-scrollbar">
+                        <div v-for="exp in filteredExpenses" :key="exp.id" class="flex justify-between items-center text-xs py-2 border-b border-stone-50">
+                            <div>
+                                <span class="font-medium text-stone-700 block">{{ exp.title }}</span>
+                                <span class="text-[9px] text-stone-400 font-mono">{{ exp.currency }}</span>
+                            </div>
+                            <div class="text-right flex items-center gap-3">
+                                <div>
+                                    <span class="font-mono font-bold text-stone-800 block">{{ exp.currency === '台幣(NTD)' ? 'NT$ ' + exp.amount : '₩ ' + exp.amount }}</span>
+                                    <span v-if="exp.currency === '韓元(KRW)'" class="text-[9px] text-stone-400 block">≈ NT$ {{ Math.round(exp.amount * 0.024) }}</span>
+                                </div>
+                                <button @click="deleteExpense(exp.id)" class="text-stone-300 hover:text-red-500"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                            </div>
+                        </div>
+                        <div v-if="filteredExpenses.length === 0" class="text-center py-6 text-xs text-stone-400 font-light">今天還沒有記帳喔！</div>
+                    </div>
+
+                    <!-- 即時換算輔助提示區 -->
+                    <div class="pt-3 border-t border-stone-100 space-y-2">
+                        <div class="grid grid-cols-2 gap-2">
+                            <input type="text" v-model="newExpense.title" placeholder="項目名稱（如：咖啡）" class="text-xs bg-stone-50 border border-stone-200 rounded-xl p-2.5 focus:outline-none">
+                            <div class="relative">
+                                <input type="number" v-model="newExpense.amount" placeholder="金額" class="w-full text-xs bg-stone-50 border border-stone-200 rounded-xl p-2.5 focus:outline-none font-mono">
+                                <span v-if="newExpense.amount" class="absolute right-2 bottom-1 text-[8px] bg-stone-800 text-white px-1.5 py-0.5 rounded">
+                                    {{ liveExchangePreview }}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="flex gap-2">
+                            <select v-model="newExpense.currency" class="text-xs bg-white border border-stone-200 rounded-xl p-2.5 focus:outline-none flex-1 font-medium text-stone-700">
+                                <option>韓元(KRW)</option><option>台幣(NTD)</option>
+                            </select>
+                            <button @click="addExpense" class="bg-cream-700 text-white text-xs font-bold rounded-xl px-5 py-2.5 shadow-2xs">記帳</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5. 資訊 Tab -->
+            <div v-if="activeTab === 'info'" class="space-y-4">
+                <div class="border-b border-cream-200 pb-2">
+                    <h3 class="text-sm font-bold text-stone-800 flex items-center gap-1">🗺️ 住宿飯店與緊急應變指南</h3>
+                </div>
+
+                <div class="space-y-4">
+                    <div v-for="(cards, category) in staticInfoStation" :key="category" class="space-y-2">
+                        <span class="text-xs font-black text-cream-700 block pl-1">📌 {{ category }}</span>
+                        <div class="space-y-2.5">
+                            <div v-for="info in cards" :key="info.id" class="bg-white border border-cream-200 p-4 rounded-2xl shadow-2xs">
+                                <h5 class="text-xs font-bold text-stone-800 border-b border-stone-100 pb-1 mb-1.5 flex items-center gap-1">{{ info.title }}</h5>
+                                <p class="text-xs text-stone-600 leading-relaxed whitespace-pre-line font-light">{{ info.content }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- 底部導航列 -->
+        <nav class="fixed bottom-0 max-w-md w-full bg-white/95 backdrop-blur-md border-t border-cream-200 py-2.5 px-3 flex justify-between items-center z-50 shadow-lg">
+            <button @click="activeTab = 'schedule'" :class="activeTab === 'schedule' ? 'text-cream-700 font-bold scale-105' : 'text-stone-400'" class="flex flex-col items-center space-y-1 flex-1 transition-transform">
+                <i data-lucide="calendar-days" class="w-5 h-5"></i><span class="text-[10px]">行程表</span>
+            </button>
+            <button @click="activeTab = 'map'" :class="activeTab === 'map' ? 'text-cream-700 font-bold scale-105' : 'text-stone-400'" class="flex flex-col items-center space-y-1 flex-1 transition-transform">
+                <i data-lucide="map" class="w-5 h-5"></i><span class="text-[10px]">景點</span>
+            </button>
+            <button @click="activeTab = 'shopping'" :class="activeTab === 'shopping' ? 'text-cream-700 font-bold scale-105' : 'text-stone-400'" class="flex flex-col items-center space-y-1 flex-1 transition-transform">
+                <i data-lucide="shopping-bag" class="w-5 h-5"></i><span class="text-[10px]">清單</span>
+            </button>
+            <button @click="activeTab = 'expense'" :class="activeTab === 'expense' ? 'text-cream-700 font-bold scale-105' : 'text-stone-400'" class="flex flex-col items-center space-y-1 flex-1 transition-transform">
+                <i data-lucide="wallet" class="w-5 h-5"></i><span class="text-[10px]">記帳</span>
+            </button>
+            <button @click="activeTab = 'info'" :class="activeTab === 'info' ? 'text-cream-700 font-bold scale-105' : 'text-stone-400'" class="flex flex-col items-center space-y-1 flex-1 transition-transform">
+                <i data-lucide="info" class="w-5 h-5"></i><span class="text-[10px]">資訊</span>
+            </button>
+        </nav>
+
+    </div>
+
+    <script>
+        const { createApp, ref, computed, onMounted, nextTick } = Vue;
+
+        createApp({
+            setup() {
+                const activeTab = ref('schedule');
+                const selectedDay = ref(1);
+                const expenseDay = ref(1);
+
+                const days = ref([
+                    { id: 1, date: '6/8 ㈠' }, { id: 2, date: '6/9 ㈡' }, { id: 3, date: '6/10 ㈢' }, { id: 4, date: '6/11 ㈣' }, { id: 5, date: '6/12 ㈤' }
+                ]);
+
+                const tabTitle = computed(() => {
+                    if (activeTab.value === 'schedule') return '釜山自由行行程表';
+                    if (activeTab.value === 'map') return '精美景點大圖與導航';
+                    if (activeTab.value === 'shopping') return '私人必買商品採購清單';
+                    if (activeTab.value === 'expense') return '各天花費帳目計算';
+                    return '重要住宿與求助資訊';
+                });
+
+                // 18大核心景點名單與【完全修正之真實景點高清照片】
+                const landmarkList = ref([
+                    { name: "松島纜車", img: "https://images.unsplash.com/photo-1578683010236-d716f9a3f461?auto=format&fit=crop&w=600&q=80" },
+                    { name: "松島龍宮步道", img: "https://images.unsplash.com/photo-1548574505-5e239809ee19?auto=format&fit=crop&w=600&q=80" },
+                    { name: "明星一隻雞", img: "https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?auto=format&fit=crop&w=600&q=80" },
+                    { name: "白淺灘文化村", img: "https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?auto=format&fit=crop&w=600&q=80" },
+                    { name: "biff廣場", img: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=600&q=80" },
+                    { name: "Daega豬肉湯飯", img: "https://images.unsplash.com/photo-1627308595229-7830a5c91f9f?auto=format&fit=crop&w=600&q=80" },
+                    { name: "sobok紫菜包飯", img: "https://images.unsplash.com/photo-1617093727343-374698b1b08d?auto=format&fit=crop&w=600&q=80" },
+                    { name: "海岸列車", img: "https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=600&q=80" },
+                    { name: "31cm海鮮刀削麵", img: "https://images.unsplash.com/photo-1612927601601-6638404737ce?auto=format&fit=crop&w=600&q=80" },
+                    { name: "海東隆宮寺", img: "https://images.unsplash.com/photo-1590301157890-4810ed352733?auto=format&fit=crop&w=600&q=80" },
+                    { name: "樂天免稅店", img: "https://images.unsplash.com/photo-1555529669-e69e7aa0ba9a?auto=format&fit=crop&w=600&q=80" },
+                    { name: "X the sky", img: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=600&q=80" },
+                    { name: "瓦房鳕鱼湯", img: "https://images.unsplash.com/photo-1534482421-64566f976cfa?auto=format&fit=crop&w=600&q=80" },
+                    { name: "海雲台", img: "https://images.unsplash.com/photo-1616447155705-728b9911e389?auto=format&fit=crop&w=600&q=80" },
+                    { name: "英子麵店炸醬麵", img: "https://images.unsplash.com/photo-1623341214825-9f4f963727da?auto=format&fit=crop&w=600&q=80" },
+                    { 
+                        name: "西面地下街", 
+                        img: "https://images.unsplash.com/photo-1511556532299-8f662fc26c06?auto=format&fit=crop&w=600&q=80",
+                        info: "🛍️ 達人激推必買：超便宜 1000 韓元正韓襪子、10000 韓元起平價正韓服飾與針織衫、韓系質感配飾（耳環、髮圈）、平價流行女鞋、各大美妝保養品牌囤貨、特色手機殼與文具小物！"
+                    },
+                    { name: "醫美", img: "https://images.unsplash.com/photo-1629909613654-28e377c37b09?auto=format&fit=crop&w=600&q=80" },
+                    { name: "老花園烤肉", img: "https://images.unsplash.com/photo-1603360946369-dc9bb6258143?auto=format&fit=crop&w=600&q=80" },
+                    { name: "Olive young", img: "https://images.unsplash.com/photo-1608248597481-496100c80836?auto=format&fit=crop&w=600&q=80" }
+                ]);
+
+                // 行前準備
+                const todoList = ref(JSON.parse(localStorage.getItem('busan_todo_v6')) || [
+                    { id: 1, text: '護照', done: false }, { id: 2, text: '牙膏牙刷', done: false },
+                    { id: 3, text: '換洗衣物', done: false }, { id: 4, text: '充電線轉接頭', done: false },
+                    { id: 5, text: '室內拖鞋', done: false }, { id: 6, text: '香水耳環手鍊化妝品', done: false },
+                    { id: 7, text: '沐浴乳保養品護髮', done: false }
+                ]);
+
+                // 行程資料 (西面地下街內容同步擴充)
+                const staticSchedules = [
+                    // Day 1
+                    { id: 1, day: 1, time: '13:00', category: '交通', location: '高鐵前往小港機場', note: '（預計下午3點半到機場報到）\n13:50 接駁車 ➔ 14:33 台南高鐵 - 14:45 左營高鐵 ➔ 14:56 左營捷運 - 15:24 小港捷運 ➔ 走路5分鐘到小港機場' },
+                    { id: 2, day: 1, time: '17:00', category: '航班', location: '高雄小港機場出發 ✈️', note: '去程班機啟航' },
+                    { id: 3, day: 1, time: '20:30', category: '航班', location: '抵達金海機場', note: '順利抵達釜山，準備出關拿行李' },
+                    { id: 4, day: 1, time: '21:00', category: '交通', location: '機場交通到住宿（預計搭計程車）', note: '① 在機場叫計程車：\n時間：約 25～35分鐘，花費：一般計程車約 18,000～20,000韓元。\n\n② 機場利木津巴士 - 2號線：\n上車地點：機場國際線航廈外1樓的「2號站牌」。\n時間：約 45～50分鐘，花費：成人約 6,000～7,500韓元。' },
+                    { id: 45, day: 1, time: '22:00', category: '美食', location: '晚餐：豬肉湯飯 或 玄風雞絲刀削麵 🍲', note: '抵達住宿下榻後，前往附近餐廳享用超暖胃宵夜美食！' },
+                    
+                    // Day 2
+                    { id: 5, day: 2, time: '10:00', category: '景點', location: '松島纜車 🚡', note: '單程約15~20分鐘，沿途可俯瞰松島海水浴場與無敵海景。\n3~6月/9~11月營業時間為 09:00-21:00。\n* 建議出發前至松島海上纜車官網確認狀況。\n票價：水晶透明車廂 $453 / 來回普通車廂 $355。' },
+                    { id: 6, day: 2, time: '10:30', category: '景點', location: '松島龍宮步道 🌉', note: '門票：₩韓幣 1000（當場買，台幣約 30 元）' },
+                    { id: 7, day: 2, time: '12:30', category: '美食', location: '午餐：明星一隻雞 🐔', note: '如不想吃一隻雞，也可以去【札嘎其市場】吃海鮮（現挑海鮮吃午餐）。' },
+                    { id: 8, day: 2, time: '14:30', category: '景點', location: '白淺灘文化村 🌊', note: '咖啡廳逛逛、體驗泡足浴一邊欣賞無敵海景。' },
+                    { id: 9, day: 2, time: '17:00', category: '景點', location: 'BIFF廣場 🍕', note: '熱鬧商圈，附近吃吃喝喝瘋狂逛街！' },
+                    { id: 10, day: 2, time: '20:00', category: '美食', location: '晚餐：Daega 豬肉湯飯 🍲', note: '品嚐道地釜山代表美食。' },
+
+                    // Day 3
+                    { id: 11, day: 3, time: '10:00', category: '美食', location: '早餐：Sobok 紫菜包飯 🍙', note: '💡 預計第三天行程幾乎都是搭乘計程車移動' },
+                    { id: 12, day: 3, time: '11:00', category: '交通', location: '海岸列車 🚃', note: '搭乘海岸列車：從尾浦站一路上行開往松亭站。' },
+                    { id: 13, day: 3, time: '12:00', category: '美食', location: '午餐：31cm 海鮮刀削麵 🍜', note: '超大碗澎湃海鮮麵。' },
+                    { id: 14, day: 3, time: '14:00', category: '景點', location: '海東龍宮寺 ⛩️', note: '建在絕壁海邊的壯觀寺廟。' },
+                    { id: 15, day: 3, time: '16:00', category: '購物', location: '樂天免稅店 🛍️', note: '從海東龍宮寺走路即可抵達免稅店！' },
+                    { id: 16, day: 3, time: '18:00', category: '景點', location: 'X the sky 看夜景 ✨', note: '搭直達電梯上到 100 樓看絕美夜景。\n* 99樓是世界上最高的星巴克（自費門票：台幣 481 元）。' },
+                    { id: 17, day: 3, time: '19:00', category: '美食', location: '晚餐：瓦房鱈魚湯 🐟', note: '美味熱湯，營業時間為 08:00 - 20:40。' },
+                    { id: 18, day: 3, time: '20:30', category: '景點', location: '晚上海雲台晃晃 🏖️', note: '悠閒漫步夜間的海雲台沙灘。' },
+
+                    // Day 4
+                    { id: 19, day: 4, time: '10:00', category: '美食', location: '出門享用英子麵店炸醬麵 🥢', note: '💡 第四天主要為購物逛街行程，有需要買什麼集中在這天採購！' },
+                    { id: 20, day: 4, time: '11:30', category: '購物', location: '西面地下街逛街 🛍️', note: '🔥 大家瘋傳必買品項：\n1. 正韓襪子（一雙約1000韓元，花色多又耐穿）\n2. 正韓平價服飾與針織衫（普遍只要10000~20000韓元超好挖寶）\n3. 流行女鞋與樂福鞋\n4. 質感耳環、髮圈與髮夾配飾\n5. 各大韓系彩妝保養品精華液\n6. 文創設計手機殼與療癒小物' },
+                    { id: 21, day: 4, time: '14:00', category: '其他', location: '醫美診所體驗（預計） 🩺', note: '候選名單：\n❶ Midam Clinic\n❷ Genius Clinic' },
+                    { id: 22, day: 4, time: '18:00', category: '美食', location: '晚餐：老花園烤肉 🥩', note: '享受正宗韓式烤肉。' },
+                    { id: 23, day: 4, time: '20:00', category: '購物', location: 'Olive Young 🛒', note: '集中採購保養品、彩妝與各種美妝好物！' },
+
+                    // Day 5
+                    { id: 24, day: 5, time: '09:30', category: '其他', location: '飯店辦理退房 🔑', note: '辦理退房，準備返程。' },
+                    { id: 25, day: 5, time: '10:00', category: '美食', location: '午餐：釜山站附近小吃 🥢', note: '美味午餐選擇：\n❶ 豬肉湯飯\n❷ 玄風雞絲刀削麵' },
+                    { id: 26, day: 5, time: '11:22', category: '交通', location: '釜山站出發 ➔ 沙上站 🚃', note: '11:22 釜山站出發搭往（橘線1號線）➔ 西面站轉乘綠線2號線➔ 11:52 抵達沙上站➔ 轉輕軌到金海機場。' },
+                    { id: 27, day: 5, time: '12:00', category: '交通', location: '抵達金海機場與辦理退稅 ✈️', note: '沙上站出來後地上有指示，跟著指標到輕軌，直達金海機場。\n* 退稅流程要抓 2 小時左右（中午 12:00 到機場）。' },
+                    { id: 28, day: 5, time: '14:15', category: '航班', location: '回程金海機場起飛 ✈️', note: '完美結束旅程！' }
+                ];
+
+                const filteredSchedule = computed(() => staticSchedules.filter(item => item.day === selectedDay.value));
+
+                // 儲存庫載入
+                const shoppingList = ref(JSON.parse(localStorage.getItem('busan_shopping_v6')) || [
+                    { id: 1, name: 'Olive Young 精華液 / 面膜', done: false, image: null },
+                    { id: 2, name: '當地伴手禮零食', done: false, image: null }
+                ]);
+                const expenses = ref(JSON.parse(localStorage.getItem('busan_expenses_v6')) || []);
+
+                const staticInfoStation = {
+                    "住宿與飯店細節": [
+                        { id: 1, title: "🏨 Brown Suites Busan（브라운스위特 부산）", content: "● 地址：\nUnit 212, 2nd Floor, Store B, Hyupsung Marina G7, 160 Chungjang-daero, 東區, 48751 釜山\n48751  부산광역시 동구 충장대로 160 협성マ리나G7\n\n● 交通指南：\n從釜山車站 10 號出口順著天橋走就可以抵達，有分 A/B 兩棟。\n\n● 入住指南：\n使用自動入住（大門 key 密碼／電梯掃 QRcode／房間 key 密碼）。\n\n● 特色與費用：\n全屋高科技住宅，直面釜山國際碼頭絕美海景。四晚四人房總共 $13,677，平均 3,420 / 人。" }
+                    ],
+                    "🚨 緊急與求助應變電話": [
+                        { id: 2, title: "📞 韓國在地求助熱線", content: "● 警察報案（治安事件）：112\n● 火災與緊急救護（救護車）：119\n● 旅遊諮詢與翻譯申訴：1330（支援中文，24小時全年無休）\n● 出入境與移民諮詢：1345" },
+                        { id: 3, title: "🇹🇼 中華民國駐釜山辦事處", content: "若遇到重大意外、護照遺失或權益受損需要駐處協助：\n● 辦事處地址：釜山廣域市中區中央大路70號9樓（近中央站6號出口）\n● 一般辦公時間：09:00 - 12:00 / 13:00 - 18:00\n● 急難救助專線（24小時）：+82-10-4537-7961" }
+                    ]
+                };
+
+                const saveToStorage = () => {
+                    localStorage.setItem('busan_todo_v6', JSON.stringify(todoList.value));
+                    localStorage.setItem('busan_shopping_v6', JSON.stringify(shoppingList.value));
+                    localStorage.setItem('busan_expenses_v6', JSON.stringify(expenses.value));
+                };
+
+                // 購物私人清單
+                const newShoppingText = ref('');
+                const addShoppingItem = () => {
+                    if (!newShoppingText.value.trim()) return;
+                    shoppingList.value.push({ id: Date.now(), name: newShoppingText.value, done: false, image: null });
+                    newShoppingText.value = ''; saveToStorage();
+                };
+                const deleteShoppingItem = (id) => { shoppingList.value = shoppingList.value.filter(i => i.id !== id); saveToStorage(); };
+                
+                const uploadShoppingImage = (event, id) => {
+                    const file = event.target.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const idx = shoppingList.value.findIndex(item => item.id === id);
+                        if (idx !== -1) { shoppingList.value[idx].image = e.target.result; saveToStorage(); }
+                    };
+                    reader.readAsDataURL(file);
+                };
+                const removeShoppingImage = (id) => {
+                    const idx = shoppingList.value.findIndex(item => item.id === id);
+                    if (idx !== -1) { shoppingList.value[idx].image = null; saveToStorage(); }
+                };
+
+                // 帳務核心
+                const newExpense = ref({ title: '', amount: '', currency: '韓元(KRW)' });
+                const filteredExpenses = computed(() => expenses.value.filter(e => e.day === expenseDay.value));
+                
+                const liveExchangePreview = computed(() => {
+                    if (!newExpense.value.amount) return '';
+                    const amt = Number(newExpense.value.amount);
+                    if (newExpense.value.currency === '韓元(KRW)') {
+                        return `≈ NT$ ${Math.round(amt * 0.024)}`;
+                    } else {
+                        return `≈ ₩ ${Math.round(amt / 0.024)}`;
+                    }
+                });
+
+                const addExpense = () => {
+                    if (!newExpense.value.title || !newExpense.value.amount) return;
+                    expenses.value.push({ id: Date.now(), day: expenseDay.value, ...newExpense.value });
+                    newExpense.value = { title: '', amount: '', currency: '韓元(KRW)' }; saveToStorage();
+                };
+                const deleteExpense = (id) => { expenses.value = expenses.value.filter(e => e.id !== id); saveToStorage(); };
+
+                const calcDayTotal = (dayId) => {
+                    let twd = 0; let krw = 0;
+                    expenses.value.filter(e => e.day === dayId).forEach(e => {
+                        if (e.currency === '台幣(NTD)') twd += Number(e.amount); else krw += Number(e.amount);
+                    });
+                    return { twd: twd + Math.round(krw * 0.024), krw: Math.round(twd / 0.024) + krw };
+                };
+                const calcAllTotal = () => {
+                    let twd = 0; let krw = 0;
+                    expenses.value.forEach(e => {
+                        if (e.currency === '台幣(NTD)') twd += Number(e.amount); else krw += Number(e.amount);
+                    });
+                    return { twd: twd + Math.round(krw * 0.024), krw: Math.round(twd / 0.024) + krw };
+                };
+
+                onMounted(() => { lucide.createIcons(); });
+
+                ref(activeTab).value = new Proxy(activeTab, {
+                    set(target, prop, val) {
+                        target[prop] = val;
+                        nextTick(() => { lucide.createIcons(); });
+                        return true;
+                    }
+                });
+
+                return {
+                    activeTab, selectedDay, expenseDay, days, landmarkList, todoList, saveToStorage, tabTitle,
+                    filteredSchedule, staticInfoStation, liveExchangePreview,
+                    shoppingList, newShoppingText, addShoppingItem, deleteShoppingItem, uploadShoppingImage, removeShoppingImage,
+                    expenses, filteredExpenses, newExpense, addExpense, deleteExpense, calcDayTotal, calcAllTotal
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
